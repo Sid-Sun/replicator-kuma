@@ -3,7 +3,7 @@ FROM louislam/uptime-kuma:1 as base
 USER root
 
 RUN apt update && \
-    apt --yes --no-install-recommends install git restic && \
+    apt --yes --no-install-recommends install procps git restic && \
     rm -rf /var/lib/apt/lists/* && \
     apt --yes autoremove
 

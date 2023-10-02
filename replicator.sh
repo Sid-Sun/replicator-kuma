@@ -15,7 +15,30 @@ function dump_tables {
     do
         sqlite3 /app/data/kuma.db '.dump "'"$table"'"' >> /backup/$BACKUP_FILE_NAME
     done
+}
 
+function debug_output {
+    git diff /backup/$BACKUP_FILE_NAME /backup/restored/backup/$BACKUP_FILE_NAME > /app/data/git-diff.sql
+    diff /backup/$BACKUP_FILE_NAME /backup/restored/backup/$BACKUP_FILE_NAME > /app/data/diff.sql
+    echo "local length" > /app/data/len.txt
+    cat /backup/$BACKUP_FILE_NAME | wc -l >> /app/data/len.txt
+    echo "remote length" >> /app/data/len.txt
+    cat /backup/restored/backup/$BACKUP_FILE_NAME | wc -l >> /app/data/len.txt
+}
+
+function stop_kuma {
+    kill $PID
+    # wait for kuma to stop
+    sleep 1;
+    while ps -p $PID >/dev/null 2>&1
+    do
+        sleep 1;
+    done
+}
+
+function start_kuma {
+    node server/server.js &
+    PID=$!
 }
 
 function restic_restore {
@@ -28,21 +51,19 @@ function restic_restore {
         if [ $LOCAL_MD5SUM != $SNAPSHOT_MD5SUM ]
         then
             echo 'restoring remote backup'
-            git diff /backup/$BACKUP_FILE_NAME /backup/restored/backup/$BACKUP_FILE_NAME > /app/data/git-diff.sql
-            diff /backup/$BACKUP_FILE_NAME /backup/restored/backup/$BACKUP_FILE_NAME > /app/data/diff.sql
-            echo "local length" > /app/data/len.txt
-            cat /backup/$BACKUP_FILE_NAME | wc -l >> /app/data/len.txt
-            echo "remote length" >> /app/data/len.txt
-            cat /backup/restored/backup/$BACKUP_FILE_NAME | wc -l >> /app/data/len.txt
-            kill $PID
-            sleep 30 # wait 30 secs for uptime-kuma to gracefully exit
+            debug_output
+            stop_kuma
+            # echo 'Dropping tables'
             for table in "${tables[@]}"
             do
-                sqlite3 /app/data/kuma.db 'DROP TABLE '"$table"';'
+                # echo 'DROP TABLE "'"$table"'";'
+                sqlite3 /app/data/kuma.db 'DROP TABLE "'"$table"'";' # && echo 'Table "'"$table"'" dropped'
             done
-            cat /backup/restored/backup/$BACKUP_FILE_NAME | sqlite3 /app/data/kuma.db
-            node server/server.js &
-            PID=$!
+            # Restore DB Data
+            # echo 'Restoring data'
+            cat /backup/restored/backup/$BACKUP_FILE_NAME | sqlite3 /app/data/kuma.db # && echo 'tables restored'
+            # echo 'Starting services'
+            start_kuma
         else
             echo 'remote and local are in sync'
         fi

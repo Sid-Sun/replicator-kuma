@@ -28,8 +28,7 @@ There are a few cons to keep in mind which are not solved:
     - also, add `cross-monitoring` for all uptime kuma instances (even monitor the main instance itself) - this will cause all instances to monitor themselves but since only main instance is source of truth, it is unavoidable
     - notification channels and notifications for monitors are not replicated by default, you must configure this across the fleet manually (or via the API - but then why why Replicator Kuma at all?)
 4. When Replicator Kuma decides to restore, it will:
-
-    1. stop the running instance of uptime-kuma within the container (gracefully)
+    1. stop the running instance of uptime-kuma within the container (gracefully) - monitoring it until it quits
     2. drop the DB tables 
     3. restore the data from dump from restic backup (this takes a lil bit)
     4. start the process again
@@ -41,7 +40,7 @@ There are a few cons to keep in mind which are not solved:
     2. these two define where notifications for downtime go and the channels to send them, these are not replicated because:
         1. these two seem to have some sort of index or something on top of it which triggers hash check every time Replicator Kuma runs 
         2. therefore, restore happens every time Replicator Kuma runs which depends on `replicator.sh` (default is every 1.5 mins)
-        3. As mentioned above, every time restore is triggered, service goes down for 30 secs+ (because of graceful exit sleep)
+        3. As mentioned above, every time restore is triggered, service will gracefully stop - this may lead to some cross-monitoring to fail but the downtime is minimal as Replicator Kuma checks to see if the service has stopped before continuing drops and restores
         4. this may not be a problem if you are okay with higher replication lag.
         5. `replicator.sh` writes 3 files to /app/data to try to debug this issue - I haven't made much progress to solve this yet, however I think:
             1. A more non-trivial method to figure out if there are changes might help - but, this is tricky as all other tables are cool with MD5 sum based diffs and this will almost definitely introduce more quirks

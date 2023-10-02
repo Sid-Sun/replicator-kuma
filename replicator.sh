@@ -46,13 +46,13 @@ function start_kuma {
 }
 
 function restic_restore {
-    # check MD5s to see if backup is new, restic creates snapshots in cases of no change too
+    # check SHA256s to see if backup is new, restic creates snapshots in cases of no change too
     # see: https://github.com/restic/restic/issues/662
     restic restore latest --target $RESTORE_PATH
     if test -f "$RESTORE_PATH/$LOCAL_PATH/$BACKUP_FILE_NAME"; then
-        SNAPSHOT_MD5SUM=$(md5sum $RESTORE_PATH/$LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
-        LOCAL_MD5SUM=$(md5sum $LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
-        if [ $LOCAL_MD5SUM != $SNAPSHOT_MD5SUM ]
+        SNAPSHOT_SHA256SUM=$(sha256sum $RESTORE_PATH/$LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
+        LOCAL_SHA256SUM=$(sha256sum $LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
+        if [ $LOCAL_SHA256SUM != $SNAPSHOT_SHA256SUM ]
         then
             echo 'restoring remote backup'
             debug_output
@@ -78,13 +78,13 @@ function restic_restore {
 }
 
 function restic_backup {
-    # check MD5s to see if backup is new, restic creates snapshots in cases of no change too
+    # check SHA256s to see if backup is new, restic creates snapshots in cases of no change too
     # see: https://github.com/restic/restic/issues/662
     restic restore latest --target $RESTORE_PATH
     if test -f "$RESTORE_PATH/$LOCAL_PATH/$BACKUP_FILE_NAME"; then
-        SNAPSHOT_MD5SUM=$(md5sum $RESTORE_PATH/$LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
-        LOCAL_MD5SUM=$(md5sum $LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
-        if [ $LOCAL_MD5SUM != $SNAPSHOT_MD5SUM ]
+        SNAPSHOT_SHA256SUM=$(sha256sum $RESTORE_PATH/$LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
+        LOCAL_SHA256SUM=$(sha256sum $LOCAL_PATH/$BACKUP_FILE_NAME | awk '{ print $1 }' )
+        if [ $LOCAL_SHA256SUM != $SNAPSHOT_SHA256SUM ]
         then
             echo 'running restic backup'
             restic backup $LOCAL_PATH

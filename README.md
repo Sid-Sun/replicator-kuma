@@ -4,7 +4,7 @@ As uptime-kuma currently has no native or blessed way to replicate monitors and 
 
 This is an extension of the uptime-kuma service which replicates some tables of the SQLite database of uptime-kuma between instances by leveraging DB dumps, restores and restic to push the dump to S3 (or other supported backends).
 
-Replicator Kuma only creates restic snapshots of files (data) when they change change (the data for heartbeats, TLS, settings, etc. i.e. monitoring and instance specific data is not replicated) this selective backup happens by leveraging MD5 sums - we dump the data and compare latest snapshot data with the new dump.
+Replicator Kuma only creates restic snapshots of files (data) when they change change (the data for heartbeats, TLS, settings, etc. i.e. monitoring and instance specific data is not replicated) this selective backup happens by leveraging SHA256 sums - we dump the data and compare latest snapshot data with the new dump.
 
 ### NOT PRODUCTION READY**
 
@@ -37,16 +37,27 @@ There are a few cons to keep in mind which are not solved:
     1. by default it replicates everything it safely can except:
         - notifications
         - monitor_notification
-    2. these two define where notifications for downtime go and the channels to send them, these are not replicated because:
+    2. these two define where notifications for downtime go and the channels to send them, these are not replicated in `replicator.sh` because:
         1. these two seem to have some sort of index or something on top of it which triggers hash check every time Replicator Kuma runs 
         2. therefore, restore happens every time Replicator Kuma runs which depends on `replicator.sh` (default is every 1.5 mins)
         3. As mentioned above, every time restore is triggered, service will gracefully stop - this may lead to some cross-monitoring to fail but the downtime is minimal as Replicator Kuma checks to see if the service has stopped before continuing drops and restores
         4. this may not be a problem if you are okay with higher replication lag.
         5. `replicator.sh` writes 3 files to /app/data to try to debug this issue - I haven't made much progress to solve this yet, however I think:
-            1. A more non-trivial method to figure out if there are changes might help - but, this is tricky as all other tables are cool with MD5 sum based diffs and this will almost definitely introduce more quirks
+            1. A more non-trivial method to figure out if there are changes might help - but, this is tricky as all other tables are cool with SHA256 sum based diffs and this will almost definitely introduce more quirks
             2. Understand exactly what is up with these 2 tables
             3. To get these files you will need to enable replication for these 2 (or even 1) table(s).
             4. Or, check this photo: https://ibb.co/swT8ZGp
+    3. update: there is now `replicator-notifs.sh` which replicates these two tables by using a different mechanism:
+        1. The problem in comparing hashes stems from `CREATE TABLE` entries in the dump file, `replicator-notifs.sh` greps for `INSERT` statements between the two dumps and compares the hashes of these - which are indeed identical if the data is identical
+        2. This _may_ be problematic when doing DB migrations and remains untested. However,:
+            1. presumably if a field is added new dump's INSERT would have the new field and might be okay, same goes for deletes - if a field is renamed and replication happens between different version numbers, this will prolly break your instance. 
+                - If this happens, a way to solve it would be to trigger a new insert or remove notification from the main instance so the new table schema is updated along with the data
+                - Obviously, this presumes main is updated before replica, so, don't update replica before main :)
+            2. notifs tables might be more or less stable on uptime-kuma
+        3. `replicator-notifs.sh` uses a separate file for these two tables - all other tables follow the classic mechanism of hashes across entire dump so they remain unaffected and free from any quirks
+        4. To use `replicator-notifs.sh` edit Dockerfile to copy it instead of vanilla `replicator.sh` to the container
+        5. Another mechanism to do this could be to use restic snapshot IDs, storing the last applied snapshot in a file on container (or data, but yah) and applying snapshot change if the ID changes - the main instance is consistent in not creating snapshot without change to data. This remains unimplemented, one quirk of this would be:
+            - If the replica notifs are updated but main is the same, the change won't be reconsiled to replica from main unless the container restarts (assuming last applied file is in container) 
 6. P.S. You need to run `restic init` to initialize backup repo - Replicator Kuma won't do this for you
 
 ### Feel free to work on these and raise a PR! <3 

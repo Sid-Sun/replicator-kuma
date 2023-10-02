@@ -34,7 +34,6 @@ function debug_output {
 function stop_kuma {
     kill $PID
     # wait for kuma to stop
-    sleep 1;
     while ps -p $PID >/dev/null 2>&1
     do
         sleep 1;

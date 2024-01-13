@@ -6,7 +6,24 @@ This is an extension of the uptime-kuma service which replicates some tables of 
 
 Replicator Kuma only creates restic snapshots of files (data) when they change change (the data for heartbeats, TLS, settings, etc. i.e. monitoring and instance specific data is not replicated) this selective backup happens by leveraging SHA256 sums - we dump the data and compare latest snapshot data with the new dump.
 
+### Merge Stratrgy Comparision Table
+
+You can switch between meodes by setting the `RESTORE_MERGE_STRATEGY` env variable to one of:
+
+- `SNAPSHOT` (_recommended_)
+- `NOTIFICATIONS_INSERT_MERGE`
+- `DEFAULT`
+
+| **script**                  | **differentiation**                                                                                                                                            | **what happens on replica**                                                           | **quirks**                                                                                                   |
+|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| **replicator.sh**           | does not replicate notification tables                                                                                                                         | restore if SHA of main and replica dump changes                                       | notifications are not replicated                                                                             |
+| **replicator-notifs.sh**    | replicates notifs tables but does change detection through a grep + SHA                                                                                        | above + SHA on grep for notification tables to check their equality                   | some columns are floats, ARM and x86 handle these differently so in a mixed fleet, every check is a restore  |
+| **replicator-snapshots.sh** | rely on main instance to do SHA check on dump, if it changes backup to restic and ALWAYS restore on replica if there is a new snapshot and when initial bootup | always restore on bootstrap + if a new snapshot is available, restore unconditionally | changes made on replica are not overwritten until restart or new main snapshot                               |
+
 ### NOT PRODUCTION READY**
+
+#### ** Since writing this, I have made the startling discovery that production is, in fact, a state of mind. 
+#### I have been running Replicator Kuma for a few months with snapshot merge strategy and have not run into an issue; I haven't, however, upgraded yet.
 
 There are a few cons to keep in mind which are not solved:
 1. DB Migrations - pin your kuma versions and when updating ensure:
@@ -55,8 +72,7 @@ There are a few cons to keep in mind which are not solved:
                 - Obviously, this presumes main is updated before replica, so, don't update replica before main :)
             2. notifs tables might be more or less stable on uptime-kuma
         3. `replicator-notifs.sh` uses a separate file for these two tables - all other tables follow the classic mechanism of hashes across entire dump so they remain unaffected and free from any quirks
-        4. To use `replicator-notifs.sh` edit Dockerfile to copy it instead of vanilla `replicator.sh` to the container
-        5. Another mechanism to do this could be to use restic snapshot IDs, storing the last applied snapshot in a file on container (or data, but yah) and applying snapshot change if the ID changes - the main instance is consistent in not creating snapshot without change to data. This remains unimplemented, one quirk of this would be:
+        4. `replicator-snapshots.sh` - use restic snapshot IDs, storing the last applied snapshot in a file on container (or data, but yah) and applying snapshot change if the ID changes - the main instance is consistent in not creating snapshot without change to data. One quirk of this would be:
             - If the replica notifs are updated but main is the same, the change won't be reconsiled to replica from main unless the container restarts (assuming last applied file is in container) 
 6. P.S. You need to run `restic init` to initialize backup repo - Replicator Kuma won't do this for you
 

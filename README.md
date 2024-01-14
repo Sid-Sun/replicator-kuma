@@ -14,6 +14,8 @@ You can switch between meodes by setting the `RESTORE_MERGE_STRATEGY` env variab
 - `NOTIFICATIONS_INSERT_MERGE`
 - `DEFAULT`
 
+Make sure to set this uniformly across your fleet, mixing and matching them will cause problems. 
+
 | **script**                  | **differentiation**                                                                                                                                            | **what happens on replica**                                                           | **quirks**                                                                                                   |
 |-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
 | **replicator.sh**           | does not replicate notification tables                                                                                                                         | restore if SHA of main and replica dump changes                                       | notifications are not replicated                                                                             |
@@ -23,7 +25,7 @@ You can switch between meodes by setting the `RESTORE_MERGE_STRATEGY` env variab
 ### NOT PRODUCTION READY**
 
 #### ** Since writing this, I have made the startling discovery that production is, in fact, a state of mind. 
-#### I have been running Replicator Kuma for a few months with snapshot merge strategy and have not run into an issue; I haven't, however, upgraded yet.
+#### I have been running Replicator Kuma for a few months with snapshot merge strategy and have not run into an issue.
 
 There are a few cons to keep in mind which are not solved:
 1. DB Migrations - pin your kuma versions and when updating ensure:

@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    environment: prod
 
     steps:
       - name: Checkout code
@@ -31,5 +32,4 @@ jobs:
       - name: Build and push Docker image
         run: |
           docker build . --file Dockerfile --tag realsidsun/replicator-kuma:$TAG
-          docker build -t your-dockerhub-username/bar:$TAG .
-          docker push your-dockerhub-username/bar:$TAG
+          docker push realsidsun/replicator-kuma:$TAG

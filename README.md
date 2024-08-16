@@ -6,6 +6,12 @@ This is an extension of the uptime-kuma project to solve this. Replicator Kuma r
 
 Replicator Kuma only creates restic snapshots of files (data) when they change change (the data for heartbeats, TLS, settings, etc. i.e. monitoring and instance specific data is not replicated) this selective backup happens by leveraging SHA256 sums - we dump the data and compare latest snapshot data with the new dump.
 
+### Getting started
+
+Replicator Kuma only adds a script to the original uptime-kuma images, the new images are published to docker hub under realsidsun/replicator-kuma and follows the same semver number as uptime-kuma (starting from 1.23.13). 
+
+Replicator Kuma may lag behind uptime kuma as the repo needs to be manually updated right now (if you notice a new update, fell free to raise a PR updating Dockerfile, the actions workflow should build and push once I merge).
+
 ### How it works
 
 Alongside the uptime-kuma service, the replicator kuma container periodically runs a few functions to either:

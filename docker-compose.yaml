@@ -3,10 +3,7 @@ version: '3.8'
 services:
   main:
     container_name: uptime-kuma-main
-    image: replicator-kuma
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
+    image: realsidsun/replicator-kuma:1.23.13
     volumes:
       - uptime-kuma-main:/app/data:rw
     ports:
@@ -20,7 +17,7 @@ services:
       - RESTIC_PASSWORD=I9n7G7G0ZpDWA3GOcJbIuwQCGvGUBkU5
   replica:
     container_name: uptime-kuma-replica
-    image: replicator-kuma
+    image: realsidsun/replicator-kuma:1.23.13
     volumes:
       - uptime-kuma-replica:/app/data:rw
     ports:

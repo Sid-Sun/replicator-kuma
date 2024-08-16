@@ -11,7 +11,7 @@ declare -a tables=("monitor" "monitor_tag" "tag" "monitor_notification" "notific
 
 function dump_tables {
     echo 'dump_tables'
-    # remove previoud backup (if any)
+    # remove previous backup (if any)
     rm -rf $LOCAL_PATH
     mkdir $LOCAL_PATH
     # append table dumps

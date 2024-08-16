@@ -1,5 +1,4 @@
-# FROM louislam/uptime-kuma:1 as base
-FROM louislam/uptime-kuma:1.23.13 as base
+FROM louislam/uptime-kuma:1.23.13
 USER root
 
 RUN apt update && \

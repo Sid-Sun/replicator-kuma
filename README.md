@@ -15,20 +15,41 @@ or
 
 One Replicator Kuma instance only does one of these duties at a time, when the instance is doing backups, it is said to be the primary instance and all the instances following it / restoring its dumps are secondary instances.
 
-There should only be one Primary instance at a time, there is no leader election. The role is assigned by the user when starting the instance through the `REPLICATOR_MODE` environment variable to either: BACKUP or `RESTORE`.
+There should only be one Primary instance at a time, there is no leader election. The role is assigned by the user when starting the instance through the `REPLICATOR_MODE` environment variable to either: `BACKUP` or `RESTORE`.
 
 ##### (the latter is not actually enforced, any value except a `BACKUP` will result in a restore / secondary instance)
 
-Things to note:
+You'll find the docker compose file to be helpful to set it up, it should be pretty straightforward especially if you've used restic before.
+
+#### Things to note:
 1. The secondary instance only does restore based on last restored snapshot and current upstream snapshot; it does not check the current live state so you could make changes to the live state of a secondary instance and it won't be overwritten until either: 
     1. the primary instance pushes a new snapshot to the restic repo
     2. the secondary instance container is restarted
 
-### IS THIS PRODUCTION READY?
+#### What is replicated?
+These are the specific tables replicated:
+```
+monitor
+monitor_tag
+tag
+monitor_notification
+notification
+monitor_group
+group
+status_page
+monitor_maintenance
+maintenance
+maintenance_status_page
+incident
+```
 
-#### Production is a state of mind. With that said, I have been running Replicator Kuma for 8+ months to monitor my services and have not run into a problem.
+### Is Replicator Kuma Production Ready?
 
-P.S. You need to run `restic init` to initialize backup repo - Replicator Kuma won't do this for you. 
-FWIW, I'm using Cloudflare R2 as repo for restic
+Production is a state of mind. With that said, I have been running Replicator Kuma for 8+ months to monitor my services and have not run into a problem.
 
-#### If you find any quirks of Replicator Kuma or want to enhance it, feel free to raise an issue, PR and whatever else is your favourite Github feature of the week <3
+P.S. You need to run `restic init` to initialize backup repo - Replicator Kuma won't do this for you. FWIW, I'm using Cloudflare R2 as repo for restic.
+
+### Contributions
+If you find any quirks of Replicator Kuma or want to enhance it, feel free to raise an issue, PR and whatever else is your favourite Github feature of the week 
+
+### ❤️

@@ -13,7 +13,6 @@ services:
       - "3001:3001"
     environment:
       - REPLICATOR_MODE=BACKUP
-      - RESTORE_MERGE_STRATEGY=SNAPSHOT
       - AWS_DEFAULT_REGION=eu-central-1
       - RESTIC_REPOSITORY=s3:s3.amazonaws.com/replicator-kuma
       - AWS_ACCESS_KEY_ID=AKIAJAJSLTZCAZ4SRI5Q
@@ -28,7 +27,6 @@ services:
       - "3002:3001"
     environment:
       - REPLICATOR_MODE=RESTORE
-      - RESTORE_MERGE_STRATEGY=SNAPSHOT
       - AWS_DEFAULT_REGION=eu-central-1
       - RESTIC_REPOSITORY=s3:s3.amazonaws.com/replicator-kuma
       - AWS_ACCESS_KEY_ID=AKIAJAJSLTZCAZ4SRI5Q

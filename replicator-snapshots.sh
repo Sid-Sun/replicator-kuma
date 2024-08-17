@@ -107,9 +107,8 @@ function backupcon {
 
 if [ $REPLICATOR_MODE = 'BACKUP' ]
 then
-while true; do sleep 60 && backupcon; done # Give uptime-kuma upto 1 minute to start up
+while true; do sleep 300 && backupcon; done # Backup every 5 mins
 fi
 
-# Give uptime-kuma main instance upto 1 minute 30 secs 
-# to start up and backup job to backup
-while true; do sleep 15 && restorecon; done
+# Restore every 6 mins
+while true; do sleep 360 && restorecon; done

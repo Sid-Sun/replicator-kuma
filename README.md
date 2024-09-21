@@ -53,7 +53,20 @@ incident
 
 Production is a state of mind. With that said, I have been running Replicator Kuma for 8+ months to monitor my services and have not run into a problem.
 
-P.S. You need to run `restic init` to initialize backup repo - Replicator Kuma won't do this for you. FWIW, I'm using Cloudflare R2 as repo for restic.
+P.S. You need to run `restic init` to initialize backup repo - Replicator Kuma won't do this for you.
+
+If you run replicator-kuma with AWS S3, you will likely stack up charges due to very regular lookups. Cloudflare R2 has higher limits but also does have charges if you exceed limits.
+Using a provider like Backblaze or idrive E2 which do not charge basis of operations but only of storage is a better idea. FWIW, I'm using iDrive E2 as repo for restic.
+
+You can skip S3 altogether and use another protocol for repos as well, restic supports basically everything.
+
+### Update Notes
+Since replicator-kuma follows same version as uptime-kuma, changes made mid-cycle get pushed to the same image; there is no plan to change this as I expect these to be few and far between.
+However, there have been a few changes which (while won't break your setup) you should note:
+
+1. Backup and Restore time rhythm was changed on 18 August 2024. Backups happen every 5 mins and Restores every 6 mins.
+2. If you've used replicator-kuma prior to 22 September 2024, your restic version is very outdated and likely created a v1 format repo; the new image comes with new restic version. v1 repos still work with the new binary but you should migrate to v2 by running `restic migrate upgrade_repo_v2`
+
 
 ### Contributions
 If you find any quirks of Replicator Kuma or want to enhance it, feel free to raise an issue, PR and whatever else is your favourite Github feature of the week 

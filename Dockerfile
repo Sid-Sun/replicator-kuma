@@ -6,6 +6,8 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/* && \
     apt --yes autoremove
 
+RUN restic self-update
+
 COPY replicator-snapshots.sh replicator-snapshots.sh
 RUN chmod +x /app/replicator-snapshots.sh
 RUN mkdir /backup

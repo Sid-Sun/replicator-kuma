@@ -9,6 +9,14 @@ PID=$!
 
 declare -a tables=("monitor" "monitor_tag" "tag" "monitor_notification" "notification" "monitor_group" "group" "status_page" "monitor_maintenance" "maintenance" "maintenance_status_page" "incident")
 
+function notify_backup {
+    [ -n "$NTFY_URL" ] && curl -d "[$HOSTNAME] Replicator Kuma Backup Successful. Time: $(date)" $NTFY_URL
+}
+
+function notify_restore {
+    [ -n "$NTFY_URL" ] && curl -d "[$HOSTNAME] Replicator Kuma Restored Successfully. Time: $(date)" $NTFY_URL
+}
+
 function dump_tables {
     echo 'dump_tables'
     # remove previous backup (if any)
@@ -66,6 +74,7 @@ function restic_restore {
             start_kuma
             # clone latest to local
             cp /backup/{latest.json,local.json}
+            notify_restore
         else
             echo 'remote and local are in sync'
         fi
@@ -86,6 +95,7 @@ function restic_backup {
         then
             echo 'running restic backup'
             restic backup $LOCAL_PATH
+            notify_backup
         else
             echo 'file is the same - skipping backup'
         fi

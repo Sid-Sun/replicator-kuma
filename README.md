@@ -66,6 +66,7 @@ However, there have been a few changes which (while won't break your setup) you 
 
 1. Backup and Restore time rhythm was changed on 18 August 2024. Backups happen every 5 mins and Restores every 6 mins.
 2. If you've used replicator-kuma prior to 22 September 2024, your restic version is very outdated and likely created a v1 format repo; the new image comes with new restic version. v1 repos still work with the new binary but you should migrate to v2 by running `restic migrate upgrade_repo_v2`
+3. As of release `1.23.15`, replicator-kuma supports notifying via ntfy.sh when backups are created and restores carried out.
 
 
 ### Contributions

@@ -15,6 +15,7 @@ services:
       - AWS_ACCESS_KEY_ID=AKIAJAJSLTZCAZ4SRI5Q
       - AWS_SECRET_ACCESS_KEY=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
       - RESTIC_PASSWORD=I9n7G7G0ZpDWA3GOcJbIuwQCGvGUBkU5
+      - NTFY_URL=ntfy.sh/myreplicatorkuma
   replica:
     container_name: uptime-kuma-replica
     image: realsidsun/replicator-kuma:1.23.13
@@ -29,6 +30,7 @@ services:
       - AWS_ACCESS_KEY_ID=AKIAJAJSLTZCAZ4SRI5Q
       - AWS_SECRET_ACCESS_KEY=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
       - RESTIC_PASSWORD=I9n7G7G0ZpDWA3GOcJbIuwQCGvGUBkU5
+      - NTFY_URL=ntfy.sh/myreplicatorkuma
 
 volumes:
   uptime-kuma-main:

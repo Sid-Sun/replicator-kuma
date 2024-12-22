@@ -1,4 +1,4 @@
-FROM louislam/uptime-kuma:1.23.15
+FROM louislam/uptime-kuma:1.23.16
 USER root
 
 RUN apt update && \

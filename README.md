@@ -1,18 +1,32 @@
-## Replicator Kuma
+# Replicator Kuma 🏳️‍🌈
 
-As uptime-kuma currently has no native or blessed way to replicate monitors and other data between instances, Replicator Kuma is an attempt to do this.
+Replicator Kuma extends the [uptime-kuma](https://github.com/louislam/uptime-kuma) project by adding support for replicating monitors, status pages, incidents and other entities between uptime-kuma instances.
 
-This is an extension of the uptime-kuma project to solve this. Replicator Kuma replicates some tables of the SQLite database between uptime-kuma instances by leveraging DB dumps and restores; restic is used to push the dump to S3 (or other supported backends) from where it is cloned to the replica/secondary instances.
+Replicator Kuma replicates data by dumping the SQLite database, using [Restic](https://github.com/restic/restic) to push this dump to a storage backend like S3, and then cloning it to replica instances.
 
-Replicator Kuma only creates restic snapshots of files (data) when they change change (the data for heartbeats, TLS, settings, etc. i.e. monitoring and instance specific data is not replicated) this selective backup happens by leveraging SHA256 sums - we dump the data and compare latest snapshot data with the new dump.
+Replicator Kuma only creates restic snapshots of files (data) when they change change (the data for heartbeats, TLS, settings, etc. i.e. monitoring and instance specific data is not replicated).
 
-### Getting started
+## Getting started & what you need to know
 
-Replicator Kuma only adds a script to the original uptime-kuma images, the new images are published to docker hub under realsidsun/replicator-kuma and follows the same semver number as uptime-kuma (starting from 1.23.13). 
+Look at the docker-compose files, modify the parameters to suit your restic replication parameters and hostname and start the containers.
 
-Replicator Kuma may lag behind uptime kuma as the repo needs to be manually updated right now (if you notice a new update, fell free to raise a PR updating Dockerfile, the actions workflow should build and push once I merge).
+Running the replica and leader in completely seperate environments** and adding them to monitor one another is recommended. 
 
-### How it works
+Do this by pointing the leader to monitor itself and all other replicas and wait until monitors are relayed across to replicas.
+
+You may add multiple replicas but not multiple leaders. Any changes made on the replicas will be overwritten when:
+1. The replica restarts
+2. The leader publishes a new snapshot (a change is made on the leader)
+
+###### **seperate environments: Ideally, seperate geographies and cloud providers (hybrid, off-cloud works too) to provide maximum insulation from an outage taking out your kumas at once.
+
+## How it works
+
+Replicator Kuma adds a script to the original uptime-kuma images to provide replication support.
+
+Starting 1.23.16-1, It also modifies monitor.js to prepend the container hostname to notificaion messages making it easier to discern which replica the notification is firing from to assist in diagnosing partial failures.
+
+The new images are published to docker hub under realsidsun/replicator-kuma and follows the same semver number as uptime-kuma (starting from 1.23.13). 
 
 Alongside the uptime-kuma service, the replicator kuma container periodically runs a few functions to either:
 1. Take a live dump of some tables (ex: monitor table) from the SQLite DB, compare the current dump's SHA to last backup from restic, if it is different, do a restic backup of the new dump
@@ -49,7 +63,7 @@ maintenance_status_page
 incident
 ```
 
-### Is Replicator Kuma Production Ready?
+## Is Replicator Kuma Production Ready?
 
 Production is a state of mind. With that said, I have been running Replicator Kuma for 8+ months to monitor my services and have not run into a problem.
 
@@ -60,16 +74,17 @@ Using a provider like Backblaze or idrive E2 which do not charge basis of operat
 
 You can skip S3 altogether and use another protocol for repos as well, restic supports basically everything.
 
-### Update Notes
+## Update Notes
 Since replicator-kuma follows same version as uptime-kuma, changes made mid-cycle get pushed to the same image; there is no plan to change this as I expect these to be few and far between.
 However, there have been a few changes which (while won't break your setup) you should note:
 
 1. Backup and Restore time rhythm was changed on 18 August 2024. Backups happen every 5 mins and Restores every 6 mins.
 2. If you've used replicator-kuma prior to 22 September 2024, your restic version is very outdated and likely created a v1 format repo; the new image comes with new restic version. v1 repos still work with the new binary but you should migrate to v2 by running `restic migrate upgrade_repo_v2`
 3. As of release `1.23.15`, replicator-kuma supports notifying via ntfy.sh when backups are created and restores carried out.
+4. As of `1.23.16-1`, we modify monitor.js to prepend the container hostname to notificaions.
 
 
-### Contributions
+## Contributions
 If you find any quirks of Replicator Kuma or want to enhance it, feel free to raise an issue, PR and whatever else is your favourite Github feature of the week 
 
-### ❤️
+# ❤️ 🏳️‍🌈

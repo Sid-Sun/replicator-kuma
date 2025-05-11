@@ -8,6 +8,10 @@ RUN apt update && \
 
 RUN restic self-update
 
+# Copy Custom Monitor.js to prepend hostname to notifications
+COPY server/model/monitor.js /app/server/model/monitor.js
+
+# Copy Replicator Kuma Stuff
 COPY replicator-snapshots.sh replicator-snapshots.sh
 RUN chmod +x /app/replicator-snapshots.sh
 RUN mkdir /backup

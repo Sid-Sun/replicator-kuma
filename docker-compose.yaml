@@ -1,9 +1,10 @@
-version: '3.8'
+version: "3.8"
 
 services:
   main:
     container_name: uptime-kuma-main
-    image: realsidsun/replicator-kuma:1.23.13
+    image: realsidsun/replicator-kuma:1.23.16-1
+    hostname: leader
     volumes:
       - uptime-kuma-main:/app/data:rw
     ports:
@@ -18,7 +19,8 @@ services:
       - NTFY_URL=ntfy.sh/myreplicatorkuma
   replica:
     container_name: uptime-kuma-replica
-    image: realsidsun/replicator-kuma:1.23.13
+    image: realsidsun/replicator-kuma:1.23.16-1
+    hostname: replica
     volumes:
       - uptime-kuma-replica:/app/data:rw
     ports:

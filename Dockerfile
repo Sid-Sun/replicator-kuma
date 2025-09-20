@@ -1,6 +1,8 @@
 FROM louislam/uptime-kuma:1.23.16
 USER root
 
+RUN sed -i 's#deb.debian.org#archive.debian.org#g' /etc/apt/sources.list
+
 RUN apt update && \
     apt --yes --no-install-recommends install procps jq git restic && \
     rm -rf /var/lib/apt/lists/* && \

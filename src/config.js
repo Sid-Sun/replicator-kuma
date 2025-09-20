@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { userInfo } from "os";
 
 // ordered_replication_tables defines all the tables to backup and restore
 // It is necessary to restore in this order due to foreign key constrains in mariadb
@@ -76,7 +77,8 @@ const getConfig = () => {
     case "embedded-mariadb":
       config.dbType = dbConfig.type;
       config.mysql = {
-        socketPath: embeddedMariaDB.socketPath,
+        socketPath: "/app/data/run/mariadb.sock",
+        username: userInfo().username,
         database: "kuma",
         timezone: "Z",
       };

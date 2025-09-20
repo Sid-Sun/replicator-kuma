@@ -3,17 +3,12 @@
 source ./replicator-functions.sh
 
 start_kuma
+wait_init
 
-function main {
-    if [ $REPLICATOR_MODE = 'BACKUP' ]
-    then
-    backupcon;
-    while true; do sleep 300 && backupcon; done 
-    fi
+if [ $REPLICATOR_MODE = 'BACKUP' ]
+then
+  while true; do backupcon; sleep 300; done
+fi
 
-    # Restore immediately then every 6 mins
-    restorecon;
-    while true; do sleep 360 && restorecon; done
-}
-
-main
+# Restore immediately then every 6 mins
+while true; do restorecon; sleep 360; done

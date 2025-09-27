@@ -1,9 +1,126 @@
-import { promises as fs } from "fs";
+import { existsSync, promises as fs } from "fs";
 import { join } from "path";
 import { config, exportPath } from "./config.js";
 import { DatabaseCommon } from "./database-common.js";
+import { generateInsertStatement } from "./csv2sql.js";
 
 class DatabaseImporter extends DatabaseCommon {
+  async runStatements(statements) {
+    for (const statement of statements) {
+      if (this.mysqlConnection) {
+        await this.mysqlConnection.execute(statement);
+      } else {
+        await new Promise((resolve, reject) => {
+          this.sqliteConnection.exec(statement, (err) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+        });
+      }
+    }
+  }
+
+  async importLocalEntityTable(filePath, tableName) {
+    // create leader table and run import
+    const sql = await fs.readFile(filePath, "utf-8");
+    const statements = sql.split(/;\s*$/m).filter((s) => s.trim().length > 0);
+    if (this.mysqlConnection) {
+      statements.unshift(
+        `CREATE TABLE IF NOT EXISTS \`leader_${tableName}\` LIKE \`${tableName}\`;`
+      );
+    } else {
+      statements.unshift(
+        `CREATE TABLE IF NOT EXISTS \`leader_${tableName}\` AS SELECT * FROM \`${tableName}\`WHERE 0;`
+      );
+    }
+    await this.runStatements(statements);
+    // imported, query local and instance tables to do conflict resolution
+    const instanceRows = await this.getAllRows(tableName);
+    const instanceMap = new Map();
+    const leaderRows = await this.getAllRows(`leader_${tableName}`);
+    const leaderMap = new Map();
+    leaderRows.forEach((row) => {
+      leaderMap.set(row["id"], row);
+    });
+    instanceRows.forEach((row) => {
+      instanceMap.set(row["id"], row);
+    });
+    const reconsileStatements = [];
+    // compare & drop local table
+    leaderRows.forEach((row) => {
+      if (!instanceMap.has(row["id"])) {
+        const headers = [];
+        const values = [];
+        for (const key in row) {
+          headers.push(key);
+          if (row[key] === null) {
+            row[key] = "null";
+          }
+          values.push(String(row[key]));
+        }
+        reconsileStatements.push(
+          generateInsertStatement(tableName, headers, values)
+        );
+      }
+      // If instance has an entry with id X, don't change it even if leader changes
+      // The idea is to let the user update this entity locally & set at instance level
+    });
+    instanceRows.forEach((row) => {
+      if (!leaderMap.has(row["id"])) {
+        reconsileStatements.push(
+          `SET SESSION FOREIGN_KEY_CHECKS = 0;
+DELETE FROM \`${tableName}\` WHERE id=${row["id"]};
+SET SESSION FOREIGN_KEY_CHECKS = 1;`
+        );
+      }
+      // If the leader does not have an entry with id X, delete it
+      // If the leader doesn't use a proxy/remote browser for a monitor, so wouldn't the follower
+      // The monitor table specifies the proxy / remote browser ID to use,
+      // it can't be unset on the leader and set on the follower as monitor is not treated as a local entity
+    });
+    // Drop the leader table we just created as we are done with it for now
+    reconsileStatements.push(`DROP TABLE \`leader_${tableName}\`;`);
+    await this.runStatements(reconsileStatements);
+    console.log(
+      `[replicator kuma] [importer] [local entity] Successfully reconsiled local entity table ${tableName}`
+    );
+  }
+
+  async getAllRows(tableName) {
+    let data;
+    if (this.mysqlConnection) {
+      try {
+        const [rows] = await this.mysqlConnection.execute(
+          `SELECT * FROM \`${tableName}\``
+        );
+        data = rows;
+      } catch (queryError) {
+        console.error(
+          `[replicator kuma] [importer] [local entity] Query error for table ${tableName}:`,
+          queryError.message
+        );
+        return;
+      }
+    } else {
+      data = await new Promise((resolve, reject) => {
+        this.sqliteConnection.all(
+          `SELECT * FROM \`${tableName}\``,
+          (err, rows) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(rows);
+            }
+          }
+        );
+      });
+    }
+    return data;
+  }
+
   async runSQLFile(filePath, tableName) {
     try {
       const sql = await fs.readFile(filePath, "utf-8");
@@ -20,36 +137,16 @@ class DatabaseImporter extends DatabaseCommon {
         );
         console.log("[replicator kuma] [importer] Disabled foreign key checks");
       }
-      for (const statement of statements) {
-        if (this.mysqlConnection) {
-          await this.mysqlConnection.execute(statement);
-        } else {
-          await new Promise((resolve, reject) => {
-            this.sqliteConnection.exec(statement, (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve();
-              }
-            });
-          });
-        }
-      }
+      await this.runStatements(statements);
       console.log(
         `[replicator kuma] [importer] Successfully executed ${filePath}`
       );
     } catch (error) {
-      if (error.code === "ENOENT") {
-        console.log(
-          `[replicator kuma] [importer] SQL file not found, skipping: ${filePath}`
-        );
-      } else {
-        console.error(
-          `[replicator kuma] [importer] Error executing SQL file ${filePath}:`,
-          error.message
-        );
-        throw error;
-      }
+      console.error(
+        `[replicator kuma] [importer] Error executing SQL file ${filePath}:`,
+        error.message
+      );
+      throw error;
     } finally {
       if (this.mysqlConnection && tableName == "monitor") {
         await this.mysqlConnection.execute(
@@ -72,7 +169,20 @@ class DatabaseImporter extends DatabaseCommon {
     // Run imports
     for (const tableName of config.tables) {
       const sqlPath = join(sqlPathPrefix, `${tableName}.sql`);
-      await this.runSQLFile(sqlPath, tableName);
+      const tableDataExists = existsSync(sqlPath);
+      if (!tableDataExists) {
+        console.log(
+          `[replicator kuma] [importer] SQL file not found, skipping: ${sqlPath}`
+        );
+        continue;
+      }
+
+      if (config.localEntities.has(tableName) && tableDataExists) {
+        // implement local entities import logic
+        await this.importLocalEntityTable(sqlPath, tableName);
+      } else {
+        await this.runSQLFile(sqlPath, tableName);
+      }
     }
   }
 

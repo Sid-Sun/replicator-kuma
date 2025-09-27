@@ -76,7 +76,7 @@ class DatabaseExporter extends DatabaseCommon {
           data = rows;
         } catch (queryError) {
           console.error(
-            `❌ Query error for table ${tableName}:`,
+            `[replicator kuma] [exporter] Could not query table ${tableName}:`,
             queryError.message
           );
           return;

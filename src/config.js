@@ -4,31 +4,54 @@ import { userInfo } from "os";
 // ordered_replication_tables defines all the tables to backup and restore
 // It is necessary to restore in this order due to foreign key constrains in mariadb
 const ordered_replication_tables = [
+  // Level 0: No dependencies
   "group",
   "user",
   "tag",
   "notification",
   "status_page",
-  "monitor",
+  "proxy",
+  "remote_browser",
+  "incident",
+
+  // Level 1: Depend on Level 0 tables
+  "api_key", // Depends on 'user'
+  "maintenance", // Depends on 'user'
+  "monitor", // Depends on 'user', 'proxy', 'remote_browser'
+
+  // Level 2: Depend on Level 1 tables (many-to-many linkers)
   "monitor_notification",
   "monitor_group",
   "monitor_tag",
-  "maintenance",
   "monitor_maintenance",
   "maintenance_status_page",
-  "incident",
 ];
 
-export const exportPath = {
-  sqlite: "/replicator_kuma/current/sqlite_exports",
-  mysql: "/replicator_kuma/current/mysql_exports",
-  sqlStatements: "/replicator_kuma/current/sql_statements",
-};
+// These are entities which should be local to each instance as if they are shared, it creates single points of failure
+const leader_entities = new Map([
+  ["proxy", true],
+  ["remote_browser", true],
+]);
+
+const IsProd = !(process.env.REPLICAOTOR_DEV == 1);
+
+export const exportPath = IsProd
+  ? {
+      sqlite: "/replicator_kuma/current/sqlite_exports",
+      mysql: "/replicator_kuma/current/mysql_exports",
+      sqlStatements: "/replicator_kuma/current/sql_statements",
+    }
+  : {
+      sqlite: "replicator_kuma/current/sqlite_exports",
+      mysql: "replicator_kuma/current/mysql_exports",
+      sqlStatements: "replicator_kuma/current/sql_statements",
+    };
 
 const getDbConfig = () => {
-  let dbConfigString = readFileSync("/app/data/db-config.json").toString(
-    "utf-8"
-  );
+  const configPath = IsProd
+    ? "/app/data/db-config.json"
+    : "./data/db-config.json";
+  let dbConfigString = readFileSync(configPath).toString("utf-8");
   let dbConfig = JSON.parse(dbConfigString);
 
   if (typeof dbConfig !== "object") {
@@ -48,6 +71,7 @@ const getDbConfig = () => {
 const getConfig = () => {
   const baseConfig = {
     isMySQL: true,
+    localEntities: leader_entities,
     tables: ordered_replication_tables,
     sqlite: {
       database: process.env.SQLITE_DATABASE || "./data/kuma.db",

@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, createReadStream } from "fs";
+import { fileURLToPath } from "url";
 import csv from "csv-parser";
 import { join } from "path";
 import { config, exportPath } from "./config.js";
@@ -17,9 +18,15 @@ const main = async () => {
   for (const tableName of config.tables) {
     const csvPath = join(csvPathPrefix, `${tableName}.csv`);
     const sqlPath = join(sqlPathPrefix, `${tableName}.sql`);
-    deleteStatements.push(`DELETE FROM \`${tableName}\`;`);
-
     const tableDataExists = existsSync(csvPath);
+    let deleteStatementCreated = false;
+
+    // if the leader's local entity table has data, don't create a drop statement
+    if (!config.localEntities.has(tableName) || !tableDataExists) {
+      deleteStatements.unshift(`DELETE FROM \`${tableName}\`;`); // delete in reverse order of insert
+      deleteStatementCreated = true;
+    }
+
     if (tableDataExists) {
       try {
         const tableResults = await csv2sql(tableName, csvPath);
@@ -59,8 +66,11 @@ const csv2sql = (tableName, csvFile) => {
       })
       .on("data", (data) => {
         const records = headers.map((header) => data[header] || "");
+        const insertTableName = config.localEntities.has(tableName)
+          ? `leader_${tableName}`
+          : tableName;
         const sqlStatement = generateInsertStatement(
-          tableName,
+          insertTableName,
           headers,
           records
         );
@@ -79,7 +89,7 @@ const csv2sql = (tableName, csvFile) => {
   });
 };
 
-const generateInsertStatement = (tableName, headers, values) => {
+export const generateInsertStatement = (tableName, headers, values) => {
   const columns = [];
   const sqlValues = [];
 
@@ -135,4 +145,6 @@ const formatSQLValue = (value) => {
   return "'" + escaped + "'";
 };
 
-main();
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
+  main();
+}

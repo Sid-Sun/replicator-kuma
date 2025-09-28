@@ -36,6 +36,7 @@ class DatabaseImporter extends DatabaseCommon {
         `CREATE TABLE IF NOT EXISTS \`leader_${tableName}\` AS SELECT * FROM \`${tableName}\`WHERE 0;`
       );
     }
+    statements.push(`DELETE FROM \`leader_${tableName}\`;`);
     await this.runStatements(statements);
     // imported, query local and instance tables to do conflict resolution
     const instanceRows = await this.getAllRows(tableName);
@@ -70,11 +71,17 @@ class DatabaseImporter extends DatabaseCommon {
     });
     instanceRows.forEach((row) => {
       if (!leaderMap.has(row["id"])) {
-        reconsileStatements.push(
-          `SET SESSION FOREIGN_KEY_CHECKS = 0;
-DELETE FROM \`${tableName}\` WHERE id=${row["id"]};
-SET SESSION FOREIGN_KEY_CHECKS = 1;`
-        );
+        if (this.mysqlConnection) {
+          reconsileStatements.push(
+            `SET SESSION FOREIGN_KEY_CHECKS = 0;`,
+            `DELETE FROM \`${tableName}\` WHERE id=${row["id"]};`,
+            `SET SESSION FOREIGN_KEY_CHECKS = 1;`
+          );
+        } else {
+          reconsileStatements.push(
+            `DELETE FROM \`${tableName}\` WHERE id=${row["id"]};`
+          );
+        }
       }
       // If the leader does not have an entry with id X, delete it
       // If the leader doesn't use a proxy/remote browser for a monitor, so wouldn't the follower
@@ -121,6 +128,26 @@ SET SESSION FOREIGN_KEY_CHECKS = 1;`
     return data;
   }
 
+  async disableFKChecks() {
+    if (this.mysqlConnection) {
+      // The monitor table references itself and the specific statements are not ordered
+      // So we Disable FK constraint checks while importing this table
+      // Alternative implementations are possible but this is the easiest
+      await this.mysqlConnection.execute("SET SESSION FOREIGN_KEY_CHECKS = 0;");
+      console.log("[replicator kuma] [importer] Disabled foreign key checks");
+    }
+  }
+
+  async enableFKChecks() {
+    if (this.mysqlConnection) {
+      // The monitor table references itself and the specific statements are not ordered
+      // So we Disable FK constraint checks while importing this table
+      // Alternative implementations are possible but this is the easiest
+      await this.mysqlConnection.execute("SET SESSION FOREIGN_KEY_CHECKS = 1;");
+      console.log("[replicator kuma] [importer] Enabled foreign key checks");
+    }
+  }
+
   async runSQLFile(filePath, tableName) {
     try {
       const sql = await fs.readFile(filePath, "utf-8");
@@ -128,14 +155,11 @@ SET SESSION FOREIGN_KEY_CHECKS = 1;`
       // This regex splits by semicolons at the end of a line, which handles multi-line statements and variations in whitespace.
       // Generated Status Page SQL if often multi-line
       const statements = sql.split(/;\s*$/m).filter((s) => s.trim().length > 0);
-      if (this.mysqlConnection && tableName == "monitor") {
+      if (tableName == "monitor") {
         // The monitor table references itself and the specific statements are not ordered
         // So we Disable FK constraint checks while importing this table
         // Alternative implementations are possible but this is the easiest
-        await this.mysqlConnection.execute(
-          "SET SESSION FOREIGN_KEY_CHECKS = 0;"
-        );
-        console.log("[replicator kuma] [importer] Disabled foreign key checks");
+        await this.disableFKChecks();
       }
       await this.runStatements(statements);
       console.log(
@@ -148,13 +172,8 @@ SET SESSION FOREIGN_KEY_CHECKS = 1;`
       );
       throw error;
     } finally {
-      if (this.mysqlConnection && tableName == "monitor") {
-        await this.mysqlConnection.execute(
-          "SET SESSION FOREIGN_KEY_CHECKS = 1;"
-        );
-        console.log(
-          "[replicator kuma] [importer] Foreign key checks re-enabled"
-        );
+      if (tableName == "monitor") {
+        await this.enableFKChecks();
       }
     }
   }
@@ -163,8 +182,10 @@ SET SESSION FOREIGN_KEY_CHECKS = 1;`
     const sqlPathPrefix = exportPath.sqlStatements;
 
     // Run truncates first
+    await this.disableFKChecks();
     const truncateSQLPath = join(sqlPathPrefix, `replicatorkuma_truncates.sql`);
     await this.runSQLFile(truncateSQLPath, "dummy");
+    await this.enableFKChecks();
 
     // Run imports
     for (const tableName of config.tables) {

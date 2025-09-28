@@ -102,7 +102,7 @@ const getConfig = () => {
       config.dbType = dbConfig.type;
       config.mysql = {
         socketPath: "/app/data/run/mariadb.sock",
-        username: userInfo().username,
+        user: userInfo().username,
         database: "kuma",
         timezone: "Z",
       };

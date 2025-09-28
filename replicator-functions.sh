@@ -1,8 +1,8 @@
 #!/usr/bin/dumb-init /bin/bash
 
-
 LOCAL_PATH=/replicator_kuma/current
 RESTORE_PATH=/replicator_kuma/restored
+MYSQL_PID_FILE="/app/data/run/mysqld.pid"
 
 PID=-1
 
@@ -24,6 +24,14 @@ function start_kuma {
         sleep 1
     done
     echo "[replicator kuma] [control module] uptime-kuma is up and running"
+}
+
+function kill_embedded_db {
+    echo "[replicator kuma] [control module] stopping embedded mariadb"
+    if [ -f "$MYSQL_PID_FILE" ]; then
+        PID=$(cat "$MYSQL_PID_FILE")
+        kill -9 "$PID"
+    fi
 }
 
 function notify_backup {
@@ -59,6 +67,7 @@ function restic_restore {
             # Restore DB Data
             node /app/replicator-kuma/database-importer.js
             # echo 'Starting services'
+            kill_embedded_db # uptime kuma will fail to start up if mariadb is already running
             start_kuma
             # clone latest to local
             cp /replicator_kuma/{latest.json,local.json}

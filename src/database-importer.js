@@ -27,6 +27,7 @@ class DatabaseImporter extends DatabaseCommon {
     // create leader table and run import
     const sql = await fs.readFile(filePath, "utf-8");
     const statements = sql.split(/;\s*$/m).filter((s) => s.trim().length > 0);
+    statements.unshift(`DELETE FROM \`leader_${tableName}\`;`);
     if (this.mysqlConnection) {
       statements.unshift(
         `CREATE TABLE IF NOT EXISTS \`leader_${tableName}\` LIKE \`${tableName}\`;`
@@ -36,7 +37,6 @@ class DatabaseImporter extends DatabaseCommon {
         `CREATE TABLE IF NOT EXISTS \`leader_${tableName}\` AS SELECT * FROM \`${tableName}\`WHERE 0;`
       );
     }
-    statements.push(`DELETE FROM \`leader_${tableName}\`;`);
     await this.runStatements(statements);
     // imported, query local and instance tables to do conflict resolution
     const instanceRows = await this.getAllRows(tableName);

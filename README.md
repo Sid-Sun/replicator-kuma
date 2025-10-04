@@ -1,71 +1,125 @@
-# Replicator Kuma 🏳️‍🌈
+# Replicator Kuma V2 🏳️‍🌈
 
 Replicator Kuma extends the [uptime-kuma](https://github.com/louislam/uptime-kuma) project by adding support for replicating monitors, status pages, incidents and other entities between uptime-kuma instances.
 
-Replicator Kuma replicates data by dumping the SQLite database, using [Restic](https://github.com/restic/restic) to push this dump to a storage backend like S3, and then cloning it to replica instances.
+Replicator Kuma replicates data by exporting the database data into CSV files, converting them to SQL and then using [Restic](https://github.com/restic/restic) to push these files to a storage backend like S3, and then cloning them to replica instances.
 
 Replicator Kuma only creates restic snapshots of files (data) when they change change (the data for heartbeats, TLS, settings, etc. i.e. monitoring and instance specific data is not replicated).
 
+What makes it v2?
+
+Uptime Kuma has gone to v2 (kinda, it is still in beta), it adds support for using MariaDB as the DB while maintaining SQLite support.
+
 ## Getting started & what you need to know
 
-Look at the docker-compose files, modify the parameters to suit your restic replication parameters and hostname and start the containers.
+Look at the `docker-compose.leader.yaml` and `docker-compose.replica.yaml` files, modify the parameters to suit your restic replication parameters and hostname and start the containers.
 
-Running the replica and leader in completely seperate environments** and adding them to monitor one another is recommended. 
+Running the replica and leader in completely seperate environments* and adding them to monitor one another is recommended.
 
 Do this by pointing the leader to monitor itself and all other replicas and wait until monitors are relayed across to replicas.
 
-You may add multiple replicas but not multiple leaders. Any changes made on the replicas will be overwritten when:
+You may add multiple replicas but not multiple leaders. Any** changes made on the replicas will be overwritten when:
 1. The replica restarts
 2. The leader publishes a new snapshot (a change is made on the leader)
 
-###### **seperate environments: Ideally, seperate geographies and cloud providers (hybrid, off-cloud works too) to provide maximum insulation from an outage taking out your kumas at once.
+###### *seperate environments: Ideally, seperate geographies and cloud providers (hybrid, off-cloud works too) to provide maximum insulation from an outage taking out your kumas at once.
+
+###### **Replicator Kuma v2 adds support for Local Entities, changes made to these are preserved if replica is running in a certain mode.
+
+### Choosing the DB
+Unlike Uptime Kuma v2, using different DBs is supported with Replicator Kuma, the replication puts no constraints on choosing the DB for each instance. 
+
+You may even use this to upgrade your SQLite instance to MySQL, simply stand up a new instance which is connected to MySQL and connect it to the current SQLite leader, wait for it to replicate and then switch the MySQL instance to be the leader.
+
+Replicator Kuma does not need to be configured with which DB is used, it will auto detect the backend and the DB credentials. Simply follow the onboarding steps after starting replicator-kuma,
+
+Note: this will erase your monitoring history.
 
 ## How it works
 
 Replicator Kuma adds a script to the original uptime-kuma images to provide replication support.
 
-Starting 1.23.16-1, It also modifies monitor.js to prepend the container hostname to notificaion messages making it easier to discern which replica the notification is firing from to assist in diagnosing partial failures.
-
-The new images are published to docker hub under realsidsun/replicator-kuma and follows the same semver number as uptime-kuma (starting from 1.23.13). 
+The new images are published to docker hub under `realsidsun/replicator-kuma`.
 
 Alongside the uptime-kuma service, the replicator kuma container periodically runs a few functions to either:
-1. Take a live dump of some tables (ex: monitor table) from the SQLite DB, compare the current dump's SHA to last backup from restic, if it is different, do a restic backup of the new dump
-or
-2. Restore the latest backup/snapshot from restic, check if it is different from the last restored snapshot, if it is, stop uptime-kuma, restore the dump from the new restore and start it again. 
+1.  **Backup:** Take a live dump of supported tables from the database into CSV files, extract SQL statements from them, compare the current dump's SHA to the last backup from restic, and if it is different, do a restic backup of the new dump.
+2.  **Restore:** Restore the latest backup/snapshot from restic, check if it is different from the last restored snapshot, and if it is, stop uptime-kuma, restore the dump from the new restore, and start it again.
 
 One Replicator Kuma instance only does one of these duties at a time, when the instance is doing backups, it is said to be the primary instance and all the instances following it / restoring its dumps are secondary instances.
 
-There should only be one Primary instance at a time, there is no leader election. The role is assigned by the user when starting the instance through the `REPLICATOR_MODE` environment variable to either: `BACKUP` or `RESTORE`.
+There should only be one Primary instance at a time, there is no leader election. The role is assigned by the user when starting the instance through the `REPLICATOR_MODE` environment variable. 
 
-##### (the latter is not actually enforced, any value except a `BACKUP` will result in a restore / secondary instance)
+If you need to change the leader:
+1. Take the current leader down
+2. Make sure the new leader instance is not presently running a restore
+3. Take the new leader down, change its repication mode and start it up again.
 
-You'll find the docker compose file to be helpful to set it up, it should be pretty straightforward especially if you've used restic before.
+### Local Entity Replication
 
-#### Things to note:
-1. The secondary instance only does restore based on last restored snapshot and current upstream snapshot; it does not check the current live state so you could make changes to the live state of a secondary instance and it won't be overwritten until either: 
-    1. the primary instance pushes a new snapshot to the restic repo
-    2. the secondary instance container is restarted
+Some entities in uptime kuma create centralisation (ex: all monitors using a proxy will fail if that proxy goes down), this is an anti-pattern for replicator kuma (each instance monitoring the target in an independent manner).
 
-#### What is replicated?
+Replicator Kuma v2 supports "Local Entity Replication" to handle these cases. When this is enabled, the leader's Local Entity is replicated to the followers but any changes made to them are preserved (ex: you can change a proxy's URL and it won't be updated). 
+
+Each instance's proxy or remote browser can be individually managed, the replication for all other entities remain unchanged.
+
+The following are treated as local entities:
+- `proxy`
+- `remote_browser`
+
+Note the following caveats (this takes proxy as an example but the same applies to remote browser):
+1. If a leader adds or deletes a proxy, this will be replicated to the proxy.
+
+    A. This also means that one monitor cannot have proxy configured on the leader and not the follower (or vice versa)
+2. If the leader updates a proxy while its value was never updated on the follower, the follower will continue to have the old value.
+
+    A. If you want to update the value across all followers, deleting the proxy, create a new proxy and configure the monitor to use the new proxy will update it for all followers.
+3. Local Entity replication is enabled for both entities, you can't choose to use it for proxy and not remote browser. 
+
+The default behaviour is to treat Local Entities as a regular entity and replace the values on the follower, it must be enabled per follower. 
+
+To enable local entity replication, set the `REPLICATOR_MODE` variable on the follower to `RESTORE_LOCAL_ENTITY_REPLICATION`.
+
+
+## Configuration
+
+Replicator Kuma is configured using environment variables.
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `REPLICATOR_MODE` | Set the mode of the replicator. Can be `BACKUP`, `RESTORE`, or `RESTORE_LOCAL_ENTITY_REPLICATION`. | `RESTORE` |
+| `RESTIC_REPOSITORY` | The restic repository URL. | |
+| `RESTIC_PASSWORD` | The restic repository password. | |
+| `NTFY_URL` | The URL for ntfy.sh notifications. | |
+| `AWS_DEFAULT_REGION` | The AWS region for S3. | optional |
+| `AWS_ACCESS_KEY_ID` | The AWS access key ID for S3. | optional |
+| `AWS_SECRET_ACCESS_KEY` | The AWS secret access key for S3. | optional |
+
+Note: The AWS keys are specified here as I use S3 as the restic storage backend in my setup, you can use any backend restic supports, simply specify the environment variables appropriately. 
+
+### What is replicated?
 These are the specific tables replicated:
 ```
-monitor
-monitor_tag
-tag
-monitor_notification
-notification
-monitor_group
 group
+user
+tag
+notification
 status_page
-monitor_maintenance
-maintenance
-maintenance_status_page
+proxy
+remote_browser
 incident
+api_key
+maintenance
+monitor
+monitor_notification
+monitor_group
+monitor_tag
+monitor_maintenance
+maintenance_status_page
 ```
 
-## Is Replicator Kuma Production Ready?
+## Is Replicator Kuma v2 Production Ready?
 
-Production is a state of mind. With that said, I have been running Replicator Kuma for 8+ months to monitor my services and have not run into a problem.
+Production is a state of mind. With that said, I have not run into any problems.
 
 P.S. You need to run `restic init` to initialize backup repo - Replicator Kuma won't do this for you.
 
@@ -75,16 +129,10 @@ Using a provider like Backblaze or idrive E2 which do not charge basis of operat
 You can skip S3 altogether and use another protocol for repos as well, restic supports basically everything.
 
 ## Update Notes
-Since replicator-kuma follows same version as uptime-kuma, changes made mid-cycle get pushed to the same image; there is no plan to change this as I expect these to be few and far between.
-However, there have been a few changes which (while won't break your setup) you should note:
-
-1. Backup and Restore time rhythm was changed on 18 August 2024. Backups happen every 5 mins and Restores every 6 mins.
-2. If you've used replicator-kuma prior to 22 September 2024, your restic version is very outdated and likely created a v1 format repo; the new image comes with new restic version. v1 repos still work with the new binary but you should migrate to v2 by running `restic migrate upgrade_repo_v2`
-3. As of release `1.23.15`, replicator-kuma supports notifying via ntfy.sh when backups are created and restores carried out.
-4. As of `1.23.16-1`, we modify monitor.js to prepend the container hostname to notificaions.
-
+1.  **New Replication Engine (v2):** The replication engine has been completely rewritten to be more robust and flexible. It now uses a CSV-based approach and supports different database backends (SQLite, MariaDB, and embedded MariaDB).
+2.  **Local Entity Replication:** Support for "Local Entity Replication" has been added to handle entities that should be local to each instance.
 
 ## Contributions
-If you find any quirks of Replicator Kuma or want to enhance it, feel free to raise an issue, PR and whatever else is your favourite Github feature of the week 
+If you find any quirks of Replicator Kuma or want to enhance it, feel free to raise an issue, PR and whatever else is your favourite Github feature of the week
 
 # ❤️ 🏳️‍🌈

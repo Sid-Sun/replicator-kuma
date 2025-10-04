@@ -3,7 +3,7 @@
 LOCAL_PATH=/replicator_kuma/current
 RESTORE_PATH=/replicator_kuma/restored
 MYSQL_PID_FILE="/app/data/run/mysqld.pid"
-LOCAL_SHA256SUM=""
+LOCAL_SHA256SUM="X"
 
 PID=-1
 

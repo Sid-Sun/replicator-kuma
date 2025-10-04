@@ -36,12 +36,12 @@ function kill_embedded_db {
 
 function notify_backup {
     echo "[replicator kuma] [control module] backup successful"
-    # [ -n "$NTFY_URL" ] && curl -d "[$HOSTNAME] Replicator Kuma Backup Successful. Time: $(date)" $NTFY_URL
+    [ -n "$NTFY_URL" ] && curl -d "[$HOSTNAME] Replicator Kuma Backup Successful. Time: $(date)" $NTFY_URL
 }
 
 function notify_restore {
     echo "[replicator kuma] [control module] restore successful"
-    # [ -n "$NTFY_URL" ] && curl -d "[$HOSTNAME] Replicator Kuma Restored Successfully. Time: $(date)" $NTFY_URL
+    [ -n "$NTFY_URL" ] && curl -d "[$HOSTNAME] Replicator Kuma Restored Successfully. Time: $(date)" $NTFY_URL
 }
 
 function restic_restore {

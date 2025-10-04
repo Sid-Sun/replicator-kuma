@@ -40,11 +40,13 @@ export const exportPath = IsProd
       sqlite: "/replicator_kuma/current/sqlite_exports",
       mysql: "/replicator_kuma/current/mysql_exports",
       sqlStatements: "/replicator_kuma/current/sql_statements",
+      localEntitySqlStatements: "/replicator_kuma/current/le_sql_statements",
     }
   : {
       sqlite: "replicator_kuma/current/sqlite_exports",
       mysql: "replicator_kuma/current/mysql_exports",
       sqlStatements: "replicator_kuma/current/sql_statements",
+      localEntitySqlStatements: "replicator_kuma/current/le_sql_statements",
     };
 
 const getDbConfig = () => {

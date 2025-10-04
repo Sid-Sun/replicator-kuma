@@ -49,7 +49,7 @@ class DatabaseImporter extends DatabaseCommon {
     instanceRows.forEach((row) => {
       instanceMap.set(row["id"], row);
     });
-    const reconsileStatements = [];
+    const reconcileStatements = [];
     // compare & drop local table
     leaderRows.forEach((row) => {
       if (!instanceMap.has(row["id"])) {
@@ -62,7 +62,7 @@ class DatabaseImporter extends DatabaseCommon {
           }
           values.push(String(row[key]));
         }
-        reconsileStatements.push(
+        reconcileStatements.push(
           generateInsertStatement(tableName, headers, values)
         );
       }
@@ -72,13 +72,13 @@ class DatabaseImporter extends DatabaseCommon {
     instanceRows.forEach((row) => {
       if (!leaderMap.has(row["id"])) {
         if (this.mysqlConnection) {
-          reconsileStatements.push(
+          reconcileStatements.push(
             `SET SESSION FOREIGN_KEY_CHECKS = 0;`,
             `DELETE FROM \`${tableName}\` WHERE id=${row["id"]};`,
             `SET SESSION FOREIGN_KEY_CHECKS = 1;`
           );
         } else {
-          reconsileStatements.push(
+          reconcileStatements.push(
             `DELETE FROM \`${tableName}\` WHERE id=${row["id"]};`
           );
         }
@@ -89,10 +89,10 @@ class DatabaseImporter extends DatabaseCommon {
       // it can't be unset on the leader and set on the follower as monitor is not treated as a local entity
     });
     // Drop the leader table we just created as we are done with it for now
-    reconsileStatements.push(`DROP TABLE \`leader_${tableName}\`;`);
-    await this.runStatements(reconsileStatements);
+    reconcileStatements.push(`DROP TABLE \`leader_${tableName}\`;`);
+    await this.runStatements(reconcileStatements);
     console.log(
-      `[replicator kuma] [importer] [local entity] Successfully reconsiled local entity table ${tableName}`
+      `[replicator kuma] [importer] [local entity] Successfully reconciled local entity table ${tableName}`
     );
   }
 
@@ -178,8 +178,11 @@ class DatabaseImporter extends DatabaseCommon {
     }
   }
 
-  async importAllTables() {
-    const sqlPathPrefix = exportPath.sqlStatements;
+  async importAllTables(leReplication) {
+    let sqlPathPrefix = exportPath.sqlStatements;
+    if (leReplication) {
+      sqlPathPrefix = exportPath.localEntitySqlStatements;
+    }
 
     // Run truncates first
     await this.disableFKChecks();
@@ -189,37 +192,36 @@ class DatabaseImporter extends DatabaseCommon {
 
     // Run imports
     for (const tableName of config.tables) {
-      const sqlPath = join(sqlPathPrefix, `${tableName}.sql`);
-      const tableDataExists = existsSync(sqlPath);
+      const importSqlPath = join(sqlPathPrefix, `${tableName}.sql`);
+      const tableDataExists = existsSync(importSqlPath);
       if (!tableDataExists) {
         console.log(
-          `[replicator kuma] [importer] SQL file not found, skipping: ${sqlPath}`
+          `[replicator kuma] [importer] SQL file not found, skipping: ${importSqlPath}`
         );
         continue;
       }
 
-      if (config.localEntities.has(tableName) && tableDataExists) {
-        // implement local entities import logic
-        await this.importLocalEntityTable(sqlPath, tableName);
+      if (leReplication && config.localEntities.has(tableName)) {
+        await this.importLocalEntityTable(importSqlPath, tableName);
       } else {
-        await this.runSQLFile(sqlPath, tableName);
+        await this.runSQLFile(importSqlPath, tableName);
       }
     }
   }
 
-  async importMySQL() {
+  async importMySQL(leReplication) {
     try {
       await this.connectMySQL();
-      await this.importAllTables();
+      await this.importAllTables(leReplication);
     } finally {
       await this.disconnectMySQL();
     }
   }
 
-  async importSQLite() {
+  async importSQLite(leReplication) {
     try {
       await this.connectSQLite();
-      await this.importAllTables();
+      await this.importAllTables(leReplication);
     } finally {
       await this.disconnectSQLite();
     }
@@ -228,10 +230,12 @@ class DatabaseImporter extends DatabaseCommon {
 
 async function main() {
   const dbImporter = new DatabaseImporter();
+  const leReplication =
+    process.env.REPLICATOR_MODE === "RESTORE_LOCAL_ENTITY_REPLICATION";
   if (config.isMySQL) {
-    await dbImporter.importMySQL();
+    await dbImporter.importMySQL(leReplication);
   } else {
-    await dbImporter.importSQLite();
+    await dbImporter.importSQLite(leReplication);
   }
 }
 

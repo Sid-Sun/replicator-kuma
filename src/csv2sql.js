@@ -7,30 +7,58 @@ import { config, exportPath } from "./config.js";
 const main = async () => {
   const csvPathPrefix = config.isMySQL ? exportPath.mysql : exportPath.sqlite;
   const sqlPathPrefix = exportPath.sqlStatements; // New directory for SQL files
+  const leSqlPathPrefix = exportPath.localEntitySqlStatements; // New directory for SQL files
 
   // Ensure the output directory exists
   if (!existsSync(sqlPathPrefix)) {
     mkdirSync(sqlPathPrefix);
   }
+  if (!existsSync(leSqlPathPrefix)) {
+    mkdirSync(leSqlPathPrefix);
+  }
 
   const deleteStatements = [];
+  const leDeleteStatements = [];
 
   for (const tableName of config.tables) {
     const csvPath = join(csvPathPrefix, `${tableName}.csv`);
     const sqlPath = join(sqlPathPrefix, `${tableName}.sql`);
+    const leSqlPath = join(leSqlPathPrefix, `${tableName}.sql`);
     const tableDataExists = existsSync(csvPath);
-    let deleteStatementCreated = false;
+    const tableIsLE = config.localEntities.has(tableName);
 
-    // if the leader's local entity table has data, don't create a drop statement
-    if (!config.localEntities.has(tableName) || !tableDataExists) {
-      deleteStatements.unshift(`DELETE FROM \`${tableName}\`;`); // delete in reverse order of insert
-      deleteStatementCreated = true;
+    // For LE tables, generate a seperate statement which imports to le_<table> as well
+    // So follower can choose if LE should be treated like all other tables or reconciled
+    // while preserving changes
+    if (tableIsLE) {
+      // special case for local entity table handling
+      if (tableDataExists) {
+        const leTableResults = await csv2sql(tableName, csvPath, true);
+        writeFileSync(leSqlPath, leTableResults.join("\n"));
+      } else {
+        // if the leader's LE table is empty, there is nothing to reconcile, delete all data from follower
+        leDeleteStatements.unshift(`DELETE FROM \`${tableName}\`;`);
+      }
+    }
+
+    // delete in reverse order of insert
+    deleteStatements.unshift(`DELETE FROM \`${tableName}\`;`);
+    if (!tableIsLE) {
+      // for delete statements of LE tables, don't generate delete as it is handled by the above logic
+      // ex: if table is user, this will still add delete but for proxy, it will let the other logic decide
+      leDeleteStatements.unshift(`DELETE FROM \`${tableName}\`;`);
     }
 
     if (tableDataExists) {
       try {
-        const tableResults = await csv2sql(tableName, csvPath);
+        const tableResults = await csv2sql(tableName, csvPath, false);
         writeFileSync(sqlPath, tableResults.join("\n"));
+        if (!tableIsLE) {
+          writeFileSync(leSqlPath, tableResults.join("\n"));
+          console.log(
+            `[replicator kuma] [csv2sql] Table ${tableName} had ${tableResults.length} entries. Wrote to ${sqlPath} & ${leSqlPath}`
+          );
+        } // if not a local entity table, output the same data to le sql folder
         console.log(
           `[replicator kuma] [csv2sql] Table ${tableName} had ${tableResults.length} entries. Wrote to ${sqlPath}`
         );
@@ -52,9 +80,18 @@ const main = async () => {
   console.log(
     `[replicator kuma] [csv2sql] Delete statements written to ${truncateSQLPath}`
   );
+
+  const leTruncateSQLPath = join(
+    leSqlPathPrefix,
+    `replicatorkuma_truncates.sql`
+  );
+  writeFileSync(leTruncateSQLPath, leDeleteStatements.join("\n"));
+  console.log(
+    `[replicator kuma] [csv2sql] LE Delete statements written to ${leTruncateSQLPath}`
+  );
 };
 
-const csv2sql = (tableName, csvFile) => {
+const csv2sql = (tableName, csvFile, treatAsLE) => {
   return new Promise((resolve, reject) => {
     const results = [];
     let headers;
@@ -66,9 +103,7 @@ const csv2sql = (tableName, csvFile) => {
       })
       .on("data", (data) => {
         const records = headers.map((header) => data[header] || "");
-        const insertTableName = config.localEntities.has(tableName)
-          ? `leader_${tableName}`
-          : tableName;
+        const insertTableName = treatAsLE ? `leader_${tableName}` : tableName;
         const sqlStatement = generateInsertStatement(
           insertTableName,
           headers,

@@ -58,10 +58,12 @@ const main = async () => {
           console.log(
             `[replicator kuma] [csv2sql] Table ${tableName} had ${tableResults.length} entries. Wrote to ${sqlPath} & ${leSqlPath}`
           );
-        } // if not a local entity table, output the same data to le sql folder
-        console.log(
-          `[replicator kuma] [csv2sql] Table ${tableName} had ${tableResults.length} entries. Wrote to ${sqlPath}`
-        );
+        } else {
+          // if not a local entity table, output the same data to le sql folder
+          console.log(
+            `[replicator kuma] [csv2sql] Table ${tableName} had ${tableResults.length} entries. Wrote to ${sqlPath}`
+          );
+        }
       } catch (err) {
         console.error(
           `[replicator kuma] [csv2sql] An error occurred processing table ${tableName}:`,

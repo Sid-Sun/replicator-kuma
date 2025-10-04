@@ -3,6 +3,7 @@
 LOCAL_PATH=/replicator_kuma/current
 RESTORE_PATH=/replicator_kuma/restored
 MYSQL_PID_FILE="/app/data/run/mysqld.pid"
+LOCAL_SHA256SUM=""
 
 PID=-1
 
@@ -51,12 +52,6 @@ function restic_restore {
     if [ "$(ls -A $RESTORE_PATH)" ]; then
         restic snapshots --json | jq '.[-1]' > /replicator_kuma/latest.json
         SNAPSHOT_SHA256SUM=$(sha256sum /replicator_kuma/latest.json | awk '{ print $1 }' )
-
-        # If file does not exist, create an empty file
-        if ! [ -f "/replicator_kuma/local.json" ]; then
-            touch /replicator_kuma/local.json
-        fi
-        LOCAL_SHA256SUM=$(sha256sum /replicator_kuma/local.json | awk '{ print $1 }' )
         echo "[restore] Snapshot: $SNAPSHOT_SHA256SUM Local: $LOCAL_SHA256SUM"
 
         if [ $LOCAL_SHA256SUM != $SNAPSHOT_SHA256SUM ]
@@ -69,8 +64,9 @@ function restic_restore {
             # echo 'Starting services'
             kill_embedded_db # uptime kuma will fail to start up if mariadb is already running
             start_kuma
-            # clone latest to local
+            # clone latest checksum to local
             cp /replicator_kuma/{latest.json,local.json}
+            LOCAL_SHA256SUM=$SNAPSHOT_SHA256SUM
             notify_restore
         else
             echo 'remote and local are in sync'

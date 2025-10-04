@@ -124,6 +124,10 @@ function wait_init {
 }
 
 function restorecon {
+    if [ "$REPLICATOR_MODE" != 'RESTORE_LOCAL_ENTITY_REPLICATION' ]
+    then
+        export REPLICATOR_MODE='RESTORE'
+    fi
     restic_restore
 }
 

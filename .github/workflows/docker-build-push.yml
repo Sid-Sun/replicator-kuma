@@ -33,5 +33,5 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t realsidsun/replicator-kuma:$TAG --push -f Dockerfile .
-          docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t realsidsun/replicator-kuma:$SLIM_TAG --push -f slim.Dockerfile .
+          docker buildx build --platform linux/amd64,linux/arm64 -t realsidsun/replicator-kuma:$TAG --push -f Dockerfile .
+          docker buildx build --platform linux/amd64,linux/arm64 -t realsidsun/replicator-kuma:$SLIM_TAG --push -f slim.Dockerfile .

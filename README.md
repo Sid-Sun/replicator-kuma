@@ -35,6 +35,12 @@ Replicator Kuma does not need to be configured with which DB is used, it will au
 
 Note: this will erase your monitoring history.
 
+### Upgrading from v1
+
+Follow the Uptime Kuma upgrade guide, start by upgrading the leader.
+
+The replication on running followers will break once the leader publishes a new snapshot, it should fix itself once the followers are upgraded. You can configure the leader to use a new v2 restic repository to avoid breaking the followers until you upgrade them.
+
 ## How it works
 
 Replicator Kuma adds a script to the original uptime-kuma images to provide replication support.

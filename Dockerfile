@@ -2,14 +2,15 @@ FROM louislam/uptime-kuma:2.0.2
 USER root
 
 RUN apt update && \
-    apt --yes --no-install-recommends install procps jq git restic netcat-openbsd && \
+    apt --yes --no-install-recommends install procps jq git restic netcat-openbsd patch && \
     rm -rf /var/lib/apt/lists/* && \
     apt --yes autoremove
 
 RUN restic self-update
 
-# Copy Custom Monitor.js to prepend hostname to notifications
-COPY server/model/monitor.js /app/server/model/monitor.js
+# Copy and apply patch to prepend hostname to notifications
+COPY monitor.js.patch /app/monitor.js.patch
+RUN patch /app/server/model/monitor.js < /app/monitor.js.patch
 
 # Copy Replicator Kuma Stuff
 COPY src /app/replicator-kuma

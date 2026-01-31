@@ -1,0 +1,13 @@
+30a31
+> const os = require("os");
+1333c1334
+<             let msg = `[${monitor.name}] [${text}] ${bean.msg}`;
+---
+>             let msg = `[${os.hostname()}] [${monitor.name}] [${text}] ${bean.msg}`;
+1345a1347,1348
+>                     } else {
+>                       heartbeatJSON["msg"] = `[${os.hostname()}] ${heartbeatJSON["msg"]}`;
+1447c1450
+<                 await Notification.send(JSON.parse(notification.config), `[${this.name}][${this.url}] ${certType} certificate ${certCN} will expire in ${daysRemaining} days`);
+---
+>                 await Notification.send(JSON.parse(notification.config), `[${os.hostname()}] [${this.name}][${this.url}] ${certType} certificate ${certCN} will expire in ${daysRemaining} days`);

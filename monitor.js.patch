@@ -1,0 +1,13 @@
+2a3
+> const os = require("os");
+1501c1502
+<             let msg = `[${monitor.name}] [${text}] ${bean.msg}`;
+---
+>             let msg = `[${os.hostname()}] [${monitor.name}] [${text}] ${bean.msg}`;
+1508a1510,1511
+>             } else {
+>                 heartbeatJSON["msg"] = `[${os.hostname()}] ${heartbeatJSON["msg"]}`;
+1602c1605
+<                     `[${this.name}][${this.url}] ${certType} certificate ${certCN} will expire in ${daysRemaining} days`
+---
+>                     `[${os.hostname()}] [${this.name}][${this.url}] ${certType} certificate ${certCN} will expire in ${daysRemaining} days`

@@ -1,4 +1,4 @@
-FROM louislam/uptime-kuma:2.0.2-slim
+FROM louislam/uptime-kuma:2.1.3-slim
 USER root
 
 RUN apt update && \
@@ -8,8 +8,9 @@ RUN apt update && \
 
 RUN restic self-update
 
-# Copy Custom Monitor.js to prepend hostname to notifications
-COPY server/model/monitor.js /app/server/model/monitor.js
+# Copy and apply patch to prepend hostname to notifications
+COPY monitor.js.patch /app/monitor.js.patch
+RUN patch /app/server/model/monitor.js < /app/monitor.js.patch
 
 # Copy Replicator Kuma Stuff
 COPY src /app/replicator-kuma

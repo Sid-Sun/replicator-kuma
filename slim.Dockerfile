@@ -2,7 +2,7 @@ FROM louislam/uptime-kuma:2.1.3-slim
 USER root
 
 RUN apt update && \
-    apt --yes --no-install-recommends install procps jq git restic netcat-openbsd && \
+    apt --yes --no-install-recommends install procps jq git restic netcat-openbsd patch && \
     rm -rf /var/lib/apt/lists/* && \
     apt --yes autoremove
 

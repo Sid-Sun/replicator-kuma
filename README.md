@@ -8,7 +8,7 @@ Replicator Kuma only creates restic snapshots of files (data) when they change c
 
 What makes it v2?
 
-Uptime Kuma has gone to v2 (kinda, it is still in beta), it adds support for using MariaDB as the DB while maintaining SQLite support.
+Uptime Kuma has gone to v2, it adds support for using MariaDB as the DB while maintaining SQLite support.
 
 ## Getting started & what you need to know
 

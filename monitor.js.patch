@@ -1,9 +1,9 @@
 1a2
 > const os = require("os");
-1476a1478,1479
+1475a1477,1478
 >             } else {
 >                 heartbeatJSON["msg"] = `[${os.hostname()}] ${heartbeatJSON["msg"]}`;
-1570c1573
+1569c1572
 <                     `[${this.name}][${this.url}] ${certType} certificate ${certCN} will expire in ${daysRemaining} days`
 ---
 >                     `[${os.hostname()}] [${this.name}][${this.url}] ${certType} certificate ${certCN} will expire in ${daysRemaining} days`
